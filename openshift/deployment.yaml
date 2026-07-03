@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loki-ruler-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: loki-ruler-demo
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: order-service
+          image: image-registry.openshift-image-registry.svc:5000/loki-ruler-demo/order-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PAYMENT_GATEWAY_URL
+              value: "http://payment-simulator:8080"
+            - name: PAYMENT_TIMEOUT
+              value: "3"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: loki-ruler-demo
+  labels:
+    app: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: order-service
+  namespace: loki-ruler-demo
+spec:
+  to:
+    kind: Service
+    name: order-service
+  port:
+    targetPort: 8080

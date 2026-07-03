@@ -1,0 +1,34 @@
+---
+- name: Payment Gateway Remediation
+  hosts: all
+  sources:
+    - ansible.eda.alertmanager:
+        host: 0.0.0.0
+        port: 5000
+
+  rules:
+    - name: Remediate payment gateway failures
+      condition: event.alert.labels.alertname == "PaymentGatewayErrorRate" and event.alert.status == "firing"
+      action:
+        run_playbook:
+          name: remediate-payment.yaml
+          extra_vars:
+            alert_name: "{{ event.alert.labels.alertname }}"
+            severity: "{{ event.alert.labels.severity }}"
+            namespace: loki-ruler-demo
+
+    - name: Remediate circuit breaker open
+      condition: event.alert.labels.alertname == "CircuitBreakerOpen" and event.alert.status == "firing"
+      action:
+        run_playbook:
+          name: remediate-payment.yaml
+          extra_vars:
+            alert_name: "{{ event.alert.labels.alertname }}"
+            severity: "{{ event.alert.labels.severity }}"
+            namespace: loki-ruler-demo
+
+    - name: Log resolved alerts
+      condition: event.alert.status == "resolved"
+      action:
+        print_event:
+          pretty: true

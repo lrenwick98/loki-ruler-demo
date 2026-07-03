@@ -1,0 +1,38 @@
+apiVersion: loki.grafana.com/v1
+kind: AlertingRule
+metadata:
+  name: order-service-alerts
+  namespace: loki-ruler-demo
+  labels:
+    openshift.io/cluster-monitoring: "true"
+spec:
+  tenantID: application
+  groups:
+    - name: payment-gateway-health
+      interval: 30s
+      rules:
+        - alert: PaymentGatewayErrorRate
+          expr: |
+            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_labels_app="order-service"} | json | msg=~"payment_gateway_timeout|payment_gateway_error|payment_gateway_connection_refused" [5m])) > 0.1
+          for: 1m
+          labels:
+            severity: critical
+            service: order-service
+            team: platform
+          annotations:
+            summary: "Payment gateway error rate is elevated"
+            description: "The order-service is experiencing payment gateway failures at a rate > 0.1/sec for more than 1 minute. Downstream payment service may be degraded."
+            runbook_url: "https://wiki.example.com/runbooks/payment-gateway-errors"
+
+        - alert: CircuitBreakerOpen
+          expr: |
+            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_labels_app="order-service"} | json | msg="circuit_breaker_open" [5m])) > 0
+          for: 30s
+          labels:
+            severity: critical
+            service: order-service
+            team: platform
+          annotations:
+            summary: "Order service circuit breaker is OPEN"
+            description: "The order-service circuit breaker has tripped due to repeated payment gateway failures. All payment requests are being rejected without contacting the gateway."
+            runbook_url: "https://wiki.example.com/runbooks/circuit-breaker-open"

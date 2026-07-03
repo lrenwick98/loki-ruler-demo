@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-simulator-code
+  namespace: loki-ruler-demo
+data:
+  server.py: |
+    import json
+    import time
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import threading
+
+    STATE = {"degraded": False}
+
+    class PaymentHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/health":
+                self._respond(200, {"status": "ok"})
+            elif self.path == "/admin/degrade":
+                STATE["degraded"] = True
+                self._respond(200, {"status": "degraded", "message": "Payment gateway now returning failures"})
+            elif self.path == "/admin/recover":
+                STATE["degraded"] = False
+                self._respond(200, {"status": "recovered", "message": "Payment gateway restored to healthy"})
+            elif self.path == "/admin/status":
+                self._respond(200, {"degraded": STATE["degraded"]})
+            else:
+                self._respond(404, {"error": "not found"})
+
+        def do_POST(self):
+            if self.path == "/pay":
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(content_length)) if content_length else {}
+
+                if STATE["degraded"]:
+                    time.sleep(5)
+                    self._respond(503, {"status": "failed", "reason": "service_unavailable"})
+                else:
+                    self._respond(200, {
+                        "status": "approved",
+                        "transaction_id": f"txn-{body.get('order_id', 'unknown')}",
+                    })
+            else:
+                self._respond(404, {"error": "not found"})
+
+        def _respond(self, code, data):
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+
+        def log_message(self, format, *args):
+            print(json.dumps({
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "level": "INFO",
+                "msg": "request",
+                "method": args[0].split()[0] if args else "",
+                "path": args[0].split()[1] if args else "",
+                "status": args[1] if len(args) > 1 else "",
+                "degraded": STATE["degraded"],
+            }))
+
+    if __name__ == "__main__":
+        server = HTTPServer(("0.0.0.0", 8080), PaymentHandler)
+        print(json.dumps({"msg": "payment_simulator_started", "port": 8080}))
+        server.serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-simulator
+  namespace: loki-ruler-demo
+  labels:
+    app: payment-simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-simulator
+  template:
+    metadata:
+      labels:
+        app: payment-simulator
+    spec:
+      containers:
+        - name: payment-simulator
+          image: registry.access.redhat.com/ubi9/python-312:latest
+          command: ["python", "/opt/app-root/src/server.py"]
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: code
+              mountPath: /opt/app-root/src
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: code
+          configMap:
+            name: payment-simulator-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-simulator
+  namespace: loki-ruler-demo
+  labels:
+    app: payment-simulator
+spec:
+  selector:
+    app: payment-simulator
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: payment-simulator
+  namespace: loki-ruler-demo
+spec:
+  to:
+    kind: Service
+    name: payment-simulator
+  port:
+    targetPort: 8080

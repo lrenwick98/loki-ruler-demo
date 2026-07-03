@@ -1,0 +1,51 @@
+---
+- name: Remediate Payment Gateway Failure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    namespace: loki-ruler-demo
+    payment_simulator_route: "http://payment-simulator.{{ namespace }}.svc:8080"
+
+  tasks:
+    - name: Log alert received
+      ansible.builtin.debug:
+        msg: >
+          REMEDIATION TRIGGERED — Alert: {{ alert_name | default('unknown') }},
+          Severity: {{ severity | default('unknown') }},
+          Namespace: {{ namespace }}
+
+    - name: Check payment simulator health
+      ansible.builtin.uri:
+        url: "{{ payment_simulator_route }}/admin/status"
+        method: GET
+        return_content: true
+      register: health_check
+      ignore_errors: true
+
+    - name: Recover payment simulator via admin endpoint
+      ansible.builtin.uri:
+        url: "{{ payment_simulator_route }}/admin/recover"
+        method: GET
+        return_content: true
+      register: recover_result
+      when: health_check.json.degraded | default(true)
+
+    - name: Log recovery result
+      ansible.builtin.debug:
+        msg: "Payment simulator recovery: {{ recover_result.json.message | default('attempted') }}"
+      when: recover_result is not skipped
+
+    - name: Restart payment simulator pod as fallback
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app=payment-simulator
+      when: recover_result is failed or health_check is failed
+
+    - name: Log remediation complete
+      ansible.builtin.debug:
+        msg: "Remediation complete for {{ alert_name | default('unknown') }} in {{ namespace }}"

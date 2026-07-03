@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: eda-webhook
+  namespace: loki-ruler-demo
+  labels:
+    alertmanagerConfig: eda-webhook
+spec:
+  route:
+    receiver: eda-receiver
+    matchers:
+      - name: service
+        value: order-service
+        matchType: "="
+    groupBy:
+      - alertname
+    groupWait: 10s
+    groupInterval: 30s
+    repeatInterval: 5m
+
+  receivers:
+    - name: eda-receiver
+      webhookConfigs:
+        - url: "http://eda-server.ansible-eda.svc:5000/endpoint"
+          sendResolved: true
