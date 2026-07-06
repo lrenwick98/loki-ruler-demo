@@ -23,7 +23,7 @@ class PaymentClient:
         elapsed = time.time() - self._circuit_open_since
         if elapsed > CIRCUIT_BREAKER_RESET_TIMEOUT:
             logger.info("Circuit breaker half-open, allowing probe request",
-                        extra={"msg": "circuit_breaker_half_open"})
+                        extra={"event": "circuit_breaker_half_open"})
             return False
         return True
 
@@ -38,7 +38,7 @@ class PaymentClient:
             logger.error(
                 "Circuit breaker OPEN after %d consecutive failures",
                 self._consecutive_failures,
-                extra={"msg": "circuit_breaker_open", "consecutive_failures": self._consecutive_failures},
+                extra={"event": "circuit_breaker_open", "consecutive_failures": self._consecutive_failures},
             )
 
     def process_payment(self, order_id: str, amount: float) -> dict:
@@ -46,7 +46,7 @@ class PaymentClient:
             logger.error(
                 "Payment rejected — circuit breaker is open for order %s",
                 order_id,
-                extra={"msg": "circuit_breaker_open", "order_id": order_id},
+                extra={"event": "circuit_breaker_open", "order_id": order_id},
             )
             return {"status": "failed", "reason": "circuit_breaker_open"}
 
@@ -65,7 +65,7 @@ class PaymentClient:
                 resp.status_code,
                 order_id,
                 extra={
-                    "msg": "payment_gateway_error",
+                    "event": "payment_gateway_error",
                     "order_id": order_id,
                     "downstream_status": resp.status_code,
                 },
@@ -77,7 +77,7 @@ class PaymentClient:
             logger.error(
                 "Payment gateway timeout for order %s",
                 order_id,
-                extra={"msg": "payment_gateway_timeout", "order_id": order_id},
+                extra={"event": "payment_gateway_timeout", "order_id": order_id},
             )
             self._record_failure()
             return {"status": "failed", "reason": "payment_gateway_timeout"}
@@ -86,7 +86,7 @@ class PaymentClient:
             logger.error(
                 "Payment gateway connection refused for order %s",
                 order_id,
-                extra={"msg": "payment_gateway_connection_refused", "order_id": order_id},
+                extra={"event": "payment_gateway_connection_refused", "order_id": order_id},
             )
             self._record_failure()
             return {"status": "failed", "reason": "payment_gateway_connection_refused"}

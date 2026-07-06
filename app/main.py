@@ -16,12 +16,10 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        if hasattr(record, "msg_key"):
-            log["msg"] = record.msg_key
-        for key in ("msg", "order_id", "downstream_status", "consecutive_failures"):
+        for key in ("event", "order_id", "downstream_status", "consecutive_failures"):
             val = getattr(record, key, None)
             if val is not None:
-                log[key] = val
+                log["msg" if key == "event" else key] = val
         return json.dumps(log)
 
 
@@ -50,7 +48,7 @@ def create_order(order: Order):
         order.customer_id,
         order.item,
         order.amount,
-        extra={"msg": "order_received", "order_id": order_id},
+        extra={"event": "order_received", "order_id": order_id},
     )
 
     result = payment_client.process_payment(order_id, order.amount)
@@ -59,7 +57,7 @@ def create_order(order: Order):
         logger.info(
             "Order %s payment approved",
             order_id,
-            extra={"msg": "payment_approved", "order_id": order_id},
+            extra={"event": "payment_approved", "order_id": order_id},
         )
         return OrderResponse(order_id=order_id, status="confirmed", message="Payment approved")
 
@@ -68,6 +66,6 @@ def create_order(order: Order):
         "Order %s payment failed — %s",
         order_id,
         reason,
-        extra={"msg": reason, "order_id": order_id},
+        extra={"event": reason, "order_id": order_id},
     )
     return OrderResponse(order_id=order_id, status="failed", message=f"Payment failed: {reason}")
