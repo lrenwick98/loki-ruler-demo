@@ -91,12 +91,6 @@ spec:
           volumeMounts:
             - name: code
               mountPath: /opt/app-root/src
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 3
-            periodSeconds: 10
           resources:
             requests:
               cpu: 50m

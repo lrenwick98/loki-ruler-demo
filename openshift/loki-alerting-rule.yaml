@@ -13,7 +13,7 @@ spec:
       rules:
         - alert: PaymentGatewayErrorRate
           expr: |
-            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_labels_app="order-service"} | json | msg=~"payment_gateway_timeout|payment_gateway_error|payment_gateway_connection_refused" [5m])) > 0.1
+            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_container_name="order-service"} | json | structured_msg=~"payment_gateway_timeout|payment_gateway_error|payment_gateway_connection_refused" [5m])) > 0.1
           for: 1m
           labels:
             severity: critical
@@ -26,7 +26,7 @@ spec:
 
         - alert: CircuitBreakerOpen
           expr: |
-            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_labels_app="order-service"} | json | msg="circuit_breaker_open" [5m])) > 0
+            sum(rate({kubernetes_namespace_name="loki-ruler-demo", kubernetes_container_name="order-service"} | json | structured_msg="circuit_breaker_open" [5m])) > 0
           for: 30s
           labels:
             severity: critical

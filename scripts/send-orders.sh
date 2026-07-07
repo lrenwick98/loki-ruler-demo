@@ -8,7 +8,7 @@ if [ -z "$ROUTE" ]; then
     ROUTE="localhost:8080"
     SCHEME="http"
 else
-    SCHEME="https"
+    SCHEME="http"
 fi
 
 ITEMS=("laptop" "keyboard" "monitor" "headset" "webcam" "docking-station" "mouse" "usb-hub")
