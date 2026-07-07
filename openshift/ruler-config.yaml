@@ -1,0 +1,12 @@
+apiVersion: loki.grafana.com/v1
+kind: RulerConfig
+metadata:
+  name: logging-loki
+  namespace: openshift-logging
+spec:
+  alertmanager:
+    enableV2: true
+    endpoints:
+      - "http://alertmanager-user-workload.openshift-user-workload-monitoring.svc:9095"
+    discovery:
+      enableSRV: false

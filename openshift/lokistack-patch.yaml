@@ -1,0 +1,13 @@
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: logging-loki
+  namespace: openshift-logging
+spec:
+  rules:
+    enabled: true
+    namespaceSelector:
+      matchLabels:
+        loki-rules: enabled
+    selector:
+      matchLabels: {}
